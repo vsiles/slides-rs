@@ -1,0 +1,6 @@
+   ▒▒▒▒ CHANGELOG management (1/3)
+
+   • Only spine/rust-sdk has an enforced CHANGELOG process
+   • Process is manual (you write the CHANGELOG)
+   • CI check is minimal (reading git comments is bad)
+   • Duplication of work (you already write your commits titles & descriptions)
