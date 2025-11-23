@@ -2,15 +2,15 @@ use clap::{Parser, ValueEnum};
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Terminal,
     backend::CrosstermBackend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Paragraph, Wrap},
-    Terminal,
 };
 use ratatui_image::{Image, Resize, picker::Picker};
 use std::{fs, io, path::PathBuf};
@@ -94,7 +94,8 @@ impl Presentation {
             // Check for slide separator
             if line.trim() == "---" {
                 if !current_items.is_empty() {
-                    let total_reveals = current_items.iter()
+                    let total_reveals = current_items
+                        .iter()
                         .filter(|item| matches!(item, ContentItem::Reveal(_)))
                         .count();
                     slides.push(Slide {
@@ -125,13 +126,14 @@ impl Presentation {
             else if line.trim_start().starts_with('+') {
                 let content = line.trim_start().strip_prefix('+').unwrap().trim_start();
                 // Format as a bullet point
-                let (formatted_line, urls, _is_heading) = if content.starts_with('-') || content.starts_with('*') {
-                    // Already has a list marker
-                    parse_line(content, &mut url_counter, heading_style)
-                } else {
-                    // Add bullet formatting
-                    (Line::from(format!("  • {}", content)), Vec::new(), false)
-                };
+                let (formatted_line, urls, _is_heading) =
+                    if content.starts_with('-') || content.starts_with('*') {
+                        // Already has a list marker
+                        parse_line(content, &mut url_counter, heading_style)
+                    } else {
+                        // Add bullet formatting
+                        (Line::from(format!("  • {}", content)), Vec::new(), false)
+                    };
                 current_urls.extend(urls);
                 current_items.push(ContentItem::Reveal(formatted_line));
             } else {
@@ -172,7 +174,8 @@ impl Presentation {
 
         // Add last slide
         if !current_items.is_empty() {
-            let total_reveals = current_items.iter()
+            let total_reveals = current_items
+                .iter()
                 .filter(|item| matches!(item, ContentItem::Reveal(_)))
                 .count();
             slides.push(Slide {
@@ -256,18 +259,26 @@ impl Presentation {
 
     fn has_images(&self) -> bool {
         let slide = &self.slides[self.current_slide];
-        slide.content.iter().any(|item| matches!(item, ContentItem::Image(_, _)))
+        slide
+            .content
+            .iter()
+            .any(|item| matches!(item, ContentItem::Image(_, _)))
     }
 }
 
-fn parse_line(text: &str, url_counter: &mut usize, heading_style: HeadingStyle) -> (Line<'static>, Vec<String>, bool) {
+fn parse_line(
+    text: &str,
+    url_counter: &mut usize,
+    heading_style: HeadingStyle,
+) -> (Line<'static>, Vec<String>, bool) {
     let trimmed = text.trim();
 
     // Calculate indentation level (count leading whitespace, treating tabs as 4 spaces)
     let leading_whitespace = &text[..text.len() - text.trim_start().len()];
-    let indent_level: usize = leading_whitespace.chars().map(|c| {
-        if c == '\t' { 4 } else { 1 }
-    }).sum();
+    let indent_level: usize = leading_whitespace
+        .chars()
+        .map(|c| if c == '\t' { 4 } else { 1 })
+        .sum();
 
     // Heading detection
     if trimmed.starts_with("# ") {
@@ -283,41 +294,49 @@ fn parse_line(text: &str, url_counter: &mut usize, heading_style: HeadingStyle) 
                 } else {
                     String::new()
                 };
-                (Line::from(vec![
-                    Span::raw(padding),
-                    Span::styled(
-                        content_upper,
-                        Style::default()
-                            .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD)
-                            .add_modifier(Modifier::UNDERLINED)
-                    )
-                ]), Vec::new(), true)
+                (
+                    Line::from(vec![
+                        Span::raw(padding),
+                        Span::styled(
+                            content_upper,
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(Modifier::BOLD)
+                                .add_modifier(Modifier::UNDERLINED),
+                        ),
+                    ]),
+                    Vec::new(),
+                    true,
+                )
             }
             HeadingStyle::Bar => {
                 // Bar style with colored background - just the text, no centering padding
                 let content_with_padding = format!("  {}  ", content);
-                (Line::from(vec![
-                    Span::styled(
+                (
+                    Line::from(vec![Span::styled(
                         content_with_padding,
                         Style::default()
                             .fg(Color::Black)
                             .bg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD)
-                    )
-                ]), Vec::new(), true)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Vec::new(),
+                    true,
+                )
             }
             HeadingStyle::Block => {
                 // Block style with colored block characters (1 block for #)
                 let full_content = format!("   ▒ {}", content.to_uppercase());
-                (Line::from(vec![
-                    Span::styled(
+                (
+                    Line::from(vec![Span::styled(
                         full_content,
                         Style::default()
                             .fg(Color::Cyan)
-                            .add_modifier(Modifier::BOLD)
-                    )
-                ]), Vec::new(), true)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Vec::new(),
+                    true,
+                )
             }
         }
     } else if trimmed.starts_with("## ") {
@@ -333,41 +352,54 @@ fn parse_line(text: &str, url_counter: &mut usize, heading_style: HeadingStyle) 
                 } else {
                     String::new()
                 };
-                (Line::from(vec![
-                    Span::raw(padding),
-                    Span::styled("▸ ", Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)),
-                    Span::styled(
-                        content.to_string(),
-                        Style::default()
-                            .fg(Color::Blue)
-                            .add_modifier(Modifier::BOLD)
-                    )
-                ]), Vec::new(), true)
+                (
+                    Line::from(vec![
+                        Span::raw(padding),
+                        Span::styled(
+                            "▸ ",
+                            Style::default()
+                                .fg(Color::Blue)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(
+                            content.to_string(),
+                            Style::default()
+                                .fg(Color::Blue)
+                                .add_modifier(Modifier::BOLD),
+                        ),
+                    ]),
+                    Vec::new(),
+                    true,
+                )
             }
             HeadingStyle::Bar => {
                 // Bar style with colored background - just the text, no centering padding
                 let content_with_padding = format!("  {}  ", content);
-                (Line::from(vec![
-                    Span::styled(
+                (
+                    Line::from(vec![Span::styled(
                         content_with_padding,
                         Style::default()
                             .fg(Color::Black)
                             .bg(Color::Blue)
-                            .add_modifier(Modifier::BOLD)
-                    )
-                ]), Vec::new(), true)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Vec::new(),
+                    true,
+                )
             }
             HeadingStyle::Block => {
                 // Block style with colored block characters (2 blocks for ##)
                 let full_content = format!("   ▒▒ {}", content);
-                (Line::from(vec![
-                    Span::styled(
+                (
+                    Line::from(vec![Span::styled(
                         full_content,
                         Style::default()
                             .fg(Color::Blue)
-                            .add_modifier(Modifier::BOLD)
-                    )
-                ]), Vec::new(), true)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Vec::new(),
+                    true,
+                )
             }
         }
     } else if trimmed.starts_with("### ") {
@@ -383,46 +415,57 @@ fn parse_line(text: &str, url_counter: &mut usize, heading_style: HeadingStyle) 
                 } else {
                     String::new()
                 };
-                (Line::from(vec![
-                    Span::raw(padding),
-                    Span::styled("  › ", Style::default().fg(Color::Magenta)),
-                    Span::styled(
-                        content.to_string(),
-                        Style::default()
-                            .fg(Color::Magenta)
-                            .add_modifier(Modifier::ITALIC)
-                    )
-                ]), Vec::new(), true)
+                (
+                    Line::from(vec![
+                        Span::raw(padding),
+                        Span::styled("  › ", Style::default().fg(Color::Magenta)),
+                        Span::styled(
+                            content.to_string(),
+                            Style::default()
+                                .fg(Color::Magenta)
+                                .add_modifier(Modifier::ITALIC),
+                        ),
+                    ]),
+                    Vec::new(),
+                    true,
+                )
             }
             HeadingStyle::Bar => {
                 // Bar style with colored background - just the text, no centering padding
                 let content_with_padding = format!("  {}  ", content);
-                (Line::from(vec![
-                    Span::styled(
+                (
+                    Line::from(vec![Span::styled(
                         content_with_padding,
                         Style::default()
                             .fg(Color::Black)
                             .bg(Color::Magenta)
-                            .add_modifier(Modifier::BOLD)
-                    )
-                ]), Vec::new(), true)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Vec::new(),
+                    true,
+                )
             }
             HeadingStyle::Block => {
                 // Block style with colored block characters (3 blocks for ###)
                 let full_content = format!("   ▒▒▒ {}", content);
-                (Line::from(vec![
-                    Span::styled(
+                (
+                    Line::from(vec![Span::styled(
                         full_content,
                         Style::default()
                             .fg(Color::Magenta)
-                            .add_modifier(Modifier::BOLD)
-                    )
-                ]), Vec::new(), true)
+                            .add_modifier(Modifier::BOLD),
+                    )]),
+                    Vec::new(),
+                    true,
+                )
             }
         }
     } else if trimmed.starts_with("```") {
-        (Line::from(trimmed.to_string())
-            .style(Style::default().fg(Color::Green)), Vec::new(), false)
+        (
+            Line::from(trimmed.to_string()).style(Style::default().fg(Color::Green)),
+            Vec::new(),
+            false,
+        )
     } else if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
         let content = if trimmed.starts_with("- ") {
             trimmed.strip_prefix("- ").unwrap()
@@ -434,9 +477,9 @@ fn parse_line(text: &str, url_counter: &mut usize, heading_style: HeadingStyle) 
         // Assuming tab = 4 spaces, group into levels
         let level = indent_level / 4;
         let (bullet, base_indent) = match level {
-            0 => ("• ", "  "),           // 2 spaces before bullet
-            1 => ("◦ ", "      "),       // 6 spaces before bullet (2 + 4)
-            _ => ("▪ ", "          "),   // 10 spaces before bullet (2 + 4 + 4)
+            0 => ("• ", "  "),         // 2 spaces before bullet
+            1 => ("◦ ", "      "),     // 6 spaces before bullet (2 + 4)
+            _ => ("▪ ", "          "), // 10 spaces before bullet (2 + 4 + 4)
         };
 
         // Parse inline formatting in list items
@@ -447,13 +490,22 @@ fn parse_line(text: &str, url_counter: &mut usize, heading_style: HeadingStyle) 
             spans.extend(line.spans);
             (Line::from(spans), urls, false)
         } else {
-            (Line::from(format!("{}{}{}", base_indent, bullet, content)), Vec::new(), false)
+            (
+                Line::from(format!("{}{}{}", base_indent, bullet, content)),
+                Vec::new(),
+                false,
+            )
         }
     } else if trimmed.starts_with('`') && trimmed.ends_with('`') && trimmed.len() > 1 {
         let content = trimmed.trim_matches('`');
-        (Line::from(vec![
-            Span::styled(content.to_string(), Style::default().fg(Color::Yellow))
-        ]), Vec::new(), false)
+        (
+            Line::from(vec![Span::styled(
+                content.to_string(),
+                Style::default().fg(Color::Yellow),
+            )]),
+            Vec::new(),
+            false,
+        )
     } else {
         // Check for inline code and links
         if trimmed.contains('`') || trimmed.contains('[') {
@@ -478,7 +530,9 @@ fn parse_inline_formatting(text: &str, url_counter: &mut usize) -> (Line<'static
                 // End code span
                 spans.push(Span::styled(
                     current.clone(),
-                    Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC)
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::ITALIC),
                 ));
                 current.clear();
                 in_code = false;
@@ -530,13 +584,13 @@ fn parse_inline_formatting(text: &str, url_counter: &mut usize) -> (Line<'static
                         link_text,
                         Style::default()
                             .fg(Color::Cyan)
-                            .add_modifier(Modifier::UNDERLINED)
+                            .add_modifier(Modifier::UNDERLINED),
                     ));
 
                     // Add reference number
                     spans.push(Span::styled(
                         format!("[{}]", *url_counter),
-                        Style::default().fg(Color::DarkGray)
+                        Style::default().fg(Color::DarkGray),
                     ));
 
                     // Store URL for later display
@@ -569,7 +623,9 @@ fn parse_inline_formatting(text: &str, url_counter: &mut usize) -> (Line<'static
         if in_code {
             spans.push(Span::styled(
                 current,
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::ITALIC)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::ITALIC),
             ));
         } else {
             spans.push(Span::raw(current));
@@ -672,14 +728,16 @@ fn parse_image_size(alt_text: &str) -> ImageSize {
     ImageSize::Auto
 }
 
-
 fn render_slide(
     presentation: &mut Presentation,
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
 ) -> io::Result<()> {
     terminal.draw(|f| {
         let current_slide = &presentation.slides[presentation.current_slide];
-        let has_images = current_slide.content.iter().any(|item| matches!(item, ContentItem::Image(_, _)));
+        let has_images = current_slide
+            .content
+            .iter()
+            .any(|item| matches!(item, ContentItem::Image(_, _)));
 
         // Calculate space needed for URL references
         let url_lines = if current_slide.urls.is_empty() {
@@ -691,9 +749,9 @@ fn render_slide(
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Min(0),           // Main content
+                Constraint::Min(0),            // Main content
                 Constraint::Length(url_lines), // URL references
-                Constraint::Length(3)          // Footer
+                Constraint::Length(3),         // Footer
             ])
             .split(f.area());
 
@@ -768,13 +826,15 @@ fn render_slide(
                         let img_w = img.width() as f32;
                         let img_h = img.height() as f32;
                         let aspect_ratio = img_h / img_w;
-                        let term_adjusted_height = (available_width as f32 * aspect_ratio * 0.5).round() as u16;
+                        let term_adjusted_height =
+                            (available_width as f32 * aspect_ratio * 0.5).round() as u16;
                         let h = term_adjusted_height.min(available_height);
                         (available_width, h)
                     }
-                    ImageSize::Both(width, height) => {
-                        ((*width).min(available_width), (*height).min(available_height))
-                    }
+                    ImageSize::Both(width, height) => (
+                        (*width).min(available_width),
+                        (*height).min(available_height),
+                    ),
                     ImageSize::WidthOnly(width) => {
                         let w = (*width).min(available_width);
                         let img_w = img.width() as f32;
@@ -818,7 +878,11 @@ fn render_slide(
                     height: img_height,
                 };
 
-                if let Ok(protocol) = presentation.picker.new_protocol(img.clone(), render_area, Resize::Fit(None)) {
+                if let Ok(protocol) =
+                    presentation
+                        .picker
+                        .new_protocol(img.clone(), render_area, Resize::Fit(None))
+                {
                     let image_widget = Image::new(&protocol);
                     f.render_widget(image_widget, render_area);
                 }
@@ -834,7 +898,10 @@ fn render_slide(
             }
         } else {
             // No image - render all content normally
-            let all_content: Vec<_> = before_image.into_iter().chain(after_image.into_iter()).collect();
+            let all_content: Vec<_> = before_image
+                .into_iter()
+                .chain(after_image.into_iter())
+                .collect();
             let text = Text::from(all_content);
             let paragraph = Paragraph::new(text)
                 .wrap(Wrap { trim: false })
@@ -849,25 +916,20 @@ fn render_slide(
                 url_lines.push(Line::from(vec![
                     Span::styled(
                         format!("[{}] ", i + 1),
-                        Style::default().fg(Color::DarkGray)
+                        Style::default().fg(Color::DarkGray),
                     ),
-                    Span::styled(
-                        url.clone(),
-                        Style::default().fg(Color::Cyan)
-                    ),
+                    Span::styled(url.clone(), Style::default().fg(Color::Cyan)),
                 ]));
             }
             let url_text = Text::from(url_lines);
-            let url_paragraph = Paragraph::new(url_text)
-                .alignment(Alignment::Left);
+            let url_paragraph = Paragraph::new(url_text).alignment(Alignment::Left);
             f.render_widget(url_paragraph, chunks[1]);
         }
 
         let reveal_info = if current_slide.total_reveals > 0 {
             format!(
                 " [{}/{}]",
-                presentation.current_reveal,
-                current_slide.total_reveals
+                presentation.current_reveal, current_slide.total_reveals
             )
         } else {
             String::new()
@@ -893,7 +955,8 @@ fn main() -> io::Result<()> {
 
     let markdown_content = fs::read_to_string(&args.markdown_file)?;
     let markdown_path = args.markdown_file.to_str().unwrap_or("unknown");
-    let mut presentation = Presentation::from_markdown(&markdown_content, markdown_path, args.style);
+    let mut presentation =
+        Presentation::from_markdown(&markdown_content, markdown_path, args.style);
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -934,7 +997,8 @@ mod tests {
     #[test]
     fn test_parse_line_simple_text() {
         let mut counter = 1;
-        let (line, urls, is_heading) = parse_line("Simple text", &mut counter, HeadingStyle::Classic);
+        let (line, urls, is_heading) =
+            parse_line("Simple text", &mut counter, HeadingStyle::Classic);
         assert_eq!(line.spans.len(), 1);
         assert_eq!(urls.len(), 0);
         assert_eq!(counter, 1); // Counter unchanged
@@ -944,7 +1008,8 @@ mod tests {
     #[test]
     fn test_parse_line_heading_level1() {
         let mut counter = 1;
-        let (line, urls, is_heading) = parse_line("# Main Title", &mut counter, HeadingStyle::Classic);
+        let (line, urls, is_heading) =
+            parse_line("# Main Title", &mut counter, HeadingStyle::Classic);
         assert_eq!(line.spans.len(), 2); // Padding + styled content
         assert_eq!(urls.len(), 0);
         assert_eq!(is_heading, true);
@@ -956,7 +1021,8 @@ mod tests {
     #[test]
     fn test_parse_line_heading_level2() {
         let mut counter = 1;
-        let (line, urls, is_heading) = parse_line("## Subtitle", &mut counter, HeadingStyle::Classic);
+        let (line, urls, is_heading) =
+            parse_line("## Subtitle", &mut counter, HeadingStyle::Classic);
         assert_eq!(line.spans.len(), 3); // Padding + arrow + text
         assert_eq!(urls.len(), 0);
         assert_eq!(is_heading, true);
@@ -965,7 +1031,8 @@ mod tests {
     #[test]
     fn test_parse_line_heading_level3() {
         let mut counter = 1;
-        let (line, urls, is_heading) = parse_line("### Subsubtitle", &mut counter, HeadingStyle::Classic);
+        let (line, urls, is_heading) =
+            parse_line("### Subsubtitle", &mut counter, HeadingStyle::Classic);
         assert_eq!(line.spans.len(), 3); // Padding + arrow + text
         assert_eq!(urls.len(), 0);
         assert_eq!(is_heading, true);
@@ -974,7 +1041,8 @@ mod tests {
     #[test]
     fn test_parse_line_bullet_level0() {
         let mut counter = 1;
-        let (line, urls, _is_heading) = parse_line("- Level 0 item", &mut counter, HeadingStyle::Classic);
+        let (line, urls, _is_heading) =
+            parse_line("- Level 0 item", &mut counter, HeadingStyle::Classic);
         assert_eq!(urls.len(), 0);
         // Check bullet is present
         let content = line.to_string();
@@ -985,7 +1053,8 @@ mod tests {
     #[test]
     fn test_parse_line_bullet_level1_with_tab() {
         let mut counter = 1;
-        let (line, urls, _is_heading) = parse_line("\t- Level 1 item", &mut counter, HeadingStyle::Classic);
+        let (line, urls, _is_heading) =
+            parse_line("\t- Level 1 item", &mut counter, HeadingStyle::Classic);
         assert_eq!(urls.len(), 0);
         // Check hollow bullet is used for level 1
         let content = line.to_string();
@@ -996,7 +1065,8 @@ mod tests {
     #[test]
     fn test_parse_line_bullet_level2_with_tabs() {
         let mut counter = 1;
-        let (line, urls, _is_heading) = parse_line("\t\t- Level 2 item", &mut counter, HeadingStyle::Classic);
+        let (line, urls, _is_heading) =
+            parse_line("\t\t- Level 2 item", &mut counter, HeadingStyle::Classic);
         assert_eq!(urls.len(), 0);
         // Check small square bullet is used for level 2+
         let content = line.to_string();
@@ -1007,7 +1077,8 @@ mod tests {
     #[test]
     fn test_parse_line_bullet_with_asterisk() {
         let mut counter = 1;
-        let (line, urls, _is_heading) = parse_line("* Asterisk bullet", &mut counter, HeadingStyle::Classic);
+        let (line, urls, _is_heading) =
+            parse_line("* Asterisk bullet", &mut counter, HeadingStyle::Classic);
         assert_eq!(urls.len(), 0);
         let content = line.to_string();
         assert!(content.contains("•"));
@@ -1017,7 +1088,11 @@ mod tests {
     #[test]
     fn test_parse_line_inline_code() {
         let mut counter = 1;
-        let (line, urls, _is_heading) = parse_line("Text with `code` inside", &mut counter, HeadingStyle::Classic);
+        let (line, urls, _is_heading) = parse_line(
+            "Text with `code` inside",
+            &mut counter,
+            HeadingStyle::Classic,
+        );
         assert_eq!(urls.len(), 0);
         assert!(line.spans.len() >= 3); // Before code, code, after code
     }
@@ -1025,7 +1100,11 @@ mod tests {
     #[test]
     fn test_parse_line_single_url() {
         let mut counter = 1;
-        let (line, urls, _is_heading) = parse_line("Check [this link](https://example.com)", &mut counter, HeadingStyle::Classic);
+        let (line, urls, _is_heading) = parse_line(
+            "Check [this link](https://example.com)",
+            &mut counter,
+            HeadingStyle::Classic,
+        );
         assert_eq!(urls.len(), 1);
         assert_eq!(urls[0], "https://example.com");
         assert_eq!(counter, 2); // Counter incremented
@@ -1038,7 +1117,11 @@ mod tests {
     #[test]
     fn test_parse_line_multiple_urls() {
         let mut counter = 1;
-        let (line, urls, _is_heading) = parse_line("See [link1](https://a.com) and [link2](https://b.com)", &mut counter, HeadingStyle::Classic);
+        let (line, urls, _is_heading) = parse_line(
+            "See [link1](https://a.com) and [link2](https://b.com)",
+            &mut counter,
+            HeadingStyle::Classic,
+        );
         assert_eq!(urls.len(), 2);
         assert_eq!(urls[0], "https://a.com");
         assert_eq!(urls[1], "https://b.com");
@@ -1051,7 +1134,11 @@ mod tests {
     #[test]
     fn test_parse_line_bullet_with_url() {
         let mut counter = 1;
-        let (line, urls, _is_heading) = parse_line("- Item with [link](https://example.com)", &mut counter, HeadingStyle::Classic);
+        let (line, urls, _is_heading) = parse_line(
+            "- Item with [link](https://example.com)",
+            &mut counter,
+            HeadingStyle::Classic,
+        );
         assert_eq!(urls.len(), 1);
         assert_eq!(urls[0], "https://example.com");
         assert_eq!(counter, 2);
@@ -1079,7 +1166,8 @@ mod tests {
     #[test]
     fn test_parse_inline_formatting_with_link() {
         let mut counter = 5; // Start at 5 to test counter continuation
-        let (line, urls) = parse_inline_formatting("text [link](https://test.com) more", &mut counter);
+        let (line, urls) =
+            parse_inline_formatting("text [link](https://test.com) more", &mut counter);
         assert_eq!(urls.len(), 1);
         assert_eq!(urls[0], "https://test.com");
         assert_eq!(counter, 6);
@@ -1090,7 +1178,10 @@ mod tests {
     #[test]
     fn test_parse_inline_formatting_code_and_link() {
         let mut counter = 1;
-        let (_line, urls) = parse_inline_formatting("run `cargo build` see [docs](https://doc.com)", &mut counter);
+        let (_line, urls) = parse_inline_formatting(
+            "run `cargo build` see [docs](https://doc.com)",
+            &mut counter,
+        );
         assert_eq!(urls.len(), 1);
         assert_eq!(urls[0], "https://doc.com");
         assert_eq!(counter, 2);
@@ -1140,11 +1231,19 @@ mod tests {
     #[test]
     fn test_url_counter_persistence() {
         let mut counter = 1;
-        let (_, urls1, _) = parse_line("First [link](https://a.com)", &mut counter, HeadingStyle::Classic);
+        let (_, urls1, _) = parse_line(
+            "First [link](https://a.com)",
+            &mut counter,
+            HeadingStyle::Classic,
+        );
         assert_eq!(urls1.len(), 1);
         assert_eq!(counter, 2);
 
-        let (_, urls2, _) = parse_line("Second [link](https://b.com)", &mut counter, HeadingStyle::Classic);
+        let (_, urls2, _) = parse_line(
+            "Second [link](https://b.com)",
+            &mut counter,
+            HeadingStyle::Classic,
+        );
         assert_eq!(urls2.len(), 1);
         assert_eq!(counter, 3);
     }

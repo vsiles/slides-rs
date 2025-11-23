@@ -39,10 +39,13 @@
         tests = craneLib.cargoNextest (commonArgs // {
           cargoArtifacts = slides-rs.cargoArtifacts;
         });
+        fmt-check = craneLib.cargoFmt (commonArgs // {
+          cargoArtifacts = slides-rs.cargoArtifacts;
+        });
       in
       {
         checks = {
-          inherit slides-rs tests;
+          inherit slides-rs tests fmt-check;
         };
 
         packages.default = slides-rs;

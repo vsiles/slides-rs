@@ -1,0 +1,16 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [ develop, main ]
+
+jobs:
+  nix-flake-check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: DeterminateSystems/nix-installer-action@main
+    - uses: DeterminateSystems/magic-nix-cache-action@main
+    - name: Run nix flake check
+      run: nix flake check
